@@ -1,0 +1,66 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: proshop_db
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 10
+
+  web1:
+    build:
+      context: ./docker-files/web
+    image: dheerajchelani/proshop-web
+    environment: &web-env
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: "False"
+      DB_NAME: proshop_db
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: 3306
+      ALLOWED_HOSTS: localhost,127.0.0.1,192.168.56.16
+      CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://192.168.56.16:8080
+    volumes:
+      - static-data:/app/staticfiles
+      - media-data:/app/media
+    ports:
+      - "8001:8000"   # sirf debugging ke liye, baad mein hata dena
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web2:
+    image: dheerajchelani/proshop-web   # web1 ki hi image, dobara build nahi hoti
+    environment: *web-env
+    volumes:
+      - static-data:/app/staticfiles
+      - media-data:/app/media
+    ports:
+      - "8002:8000"   # sirf debugging ke liye, baad mein hata dena
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:stable
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static-data:/app/staticfiles:ro
+      - media-data:/app/media:ro
+    depends_on:
+      - web1
+      - web2
+
+volumes:
+  db-data:
+  static-data:
+  media-data:
